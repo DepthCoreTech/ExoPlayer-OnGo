@@ -701,6 +701,11 @@ public final class DefaultAudioSink implements AudioSink {
     int outputChannelConfig;
     int outputPcmFrameSize;
 
+    ////ATPHUB: start pipeline
+    Log.i( tech.depthcore.atphub.ATPhub.TAG, "........start pipeline: sampleRate=" + inputFormat.sampleRate + ", channles="   + inputFormat.channelCount );
+    tech.depthcore.atphub.ATPhub.startPipe( inputFormat.sampleRate, inputFormat.channelCount );
+    //////////////////////////////////////////////////////////////
+
     if (MimeTypes.AUDIO_RAW.equals(inputFormat.sampleMimeType)) {
       Assertions.checkArgument(Util.isEncodingLinearPcm(inputFormat.pcmEncoding));
 
@@ -891,7 +896,9 @@ public final class DefaultAudioSink implements AudioSink {
   public boolean handleBuffer(
       ByteBuffer buffer, long presentationTimeUs, int encodedAccessUnitCount)
       throws InitializationException, WriteException {
-    Assertions.checkArgument(inputBuffer == null || buffer == inputBuffer);
+    ////ATPHUB: disable checkArgument: buffer == inputBuffer
+    ////- Assertions.checkArgument(inputBuffer == null || buffer == inputBuffer);
+    //////////////////////////////////////////////////////////////////////////
 
     if (pendingConfiguration != null) {
       if (!drainToEndOfStream()) {
@@ -1025,7 +1032,19 @@ public final class DefaultAudioSink implements AudioSink {
         submittedEncodedFrames += (long) framesPerEncodedSample * encodedAccessUnitCount;
       }
 
-      inputBuffer = buffer;
+      ////ATPHUB: replace buffer by androhub.audioBuffer, and noPlaying-noBuffering
+      ////inputBuffer = buffer;
+      if( tech.depthcore.atphub.ATPhub.isServiceRunning() ) {
+        if( playing )
+          inputBuffer = tech.depthcore.atphub.ATPhub.redirectToPipe( buffer, playing );
+        else
+          return false;  //no playing, no buffering
+      }
+      else {
+        inputBuffer = buffer;
+      }
+      /////////////////////////////////////////////////////////////////////
+
       inputBufferAccessUnitCount = encodedAccessUnitCount;
     }
 
@@ -1498,6 +1517,11 @@ public final class DefaultAudioSink implements AudioSink {
     }
     playing = false;
     offloadDisabledUntilNextConfiguration = false;
+    ////ATPHUB: stop pipeline
+    Log.i( tech.depthcore.atphub.ATPhub.TAG, "........stop pipeline........." );
+    tech.depthcore.atphub.ATPhub.stopPipe( );
+    //////////////////////////////////////////////////////////////
+    
   }
 
   // Internal methods.
